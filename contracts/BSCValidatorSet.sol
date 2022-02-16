@@ -67,6 +67,11 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
   // key is the `consensusAddress` of `Validator`,
   mapping(address => MaintainInfo) public maintainInfoMap;
 
+  // BEP-131 candidate validator
+  uint256 public numOfActiveValidators = 21;
+  uint256 public maxNumOfCandidates = 20;
+  uint256 public maxNumOfWorkingCandidates = 2;
+
   struct Validator{
     address consensusAddress;
     address payable feeAddress;
@@ -344,6 +349,39 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
     return CODE_OK;
   }
 
+  function swap(address[] memory set, uint i, uint j) internal pure {
+        address tmp = set[i];
+        set[i]=set[j];
+        set[j]=tmp;
+  }
+
+  function getMiningValidators(uint256 epochNumber) public view returns(address[] memory) {
+    address[] memory validators = getValidators();
+    if (validators.length <= numOfActiveValidators) {
+      return validators;
+    }
+    
+    uint round = epochNumber % numOfActiveValidators;
+    uint start = numOfActiveValidators - maxNumOfWorkingCandidates;
+    for (uint i = 0; i<maxNumOfWorkingCandidates; i++) {
+        uint target=(round+i)%numOfActiveValidators;
+        if ( (start+i)!= target ) {
+          swap(validators, target, start+i);
+        }
+    }
+    uint randomSize = validators.length-numOfActiveValidators;
+    for (uint i=start; i<validators.length; i++) {
+      uint random = uint(keccak256(abi.encodePacked(epochNumber, validators[i]))) % randomSize;
+      swap(validators, i, numOfActiveValidators+random);
+    }
+
+    address[] memory miningValidators = new address[](numOfActiveValidators);
+    for (uint i=0;i<numOfActiveValidators;i++) {
+      miningValidators[i] = validators[i];
+    }
+    return miningValidators;
+  }
+
   function getValidators() public view returns(address[] memory) {
     uint n = currentValidatorSet.length;
     uint valid = 0;
@@ -478,6 +516,22 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
       uint256 newMaintainSlashScale = BytesToTypes.bytesToUint256(32, value);
       require(newMaintainSlashScale > 0, "the maintainSlashScale must be greater than 0");
       maintainSlashScale = newMaintainSlashScale;
+    } else if (Memory.compareStrings(key, "maxNumOfWorkingCandidates")) {
+      require(value.length == 32, "length of maxNumOfWorkingCandidates mismatch");
+      uint256 newMaxNumOfWorkingCandidates = BytesToTypes.bytesToUint256(32, value);
+      require(newMaxNumOfWorkingCandidates >= 0, "the maxNumOfWorkingCandidates must be not less than 0");
+      require(newMaxNumOfWorkingCandidates <= maxNumOfCandidates, "the maxNumOfWorkingCandidates must be not less than maxNumOfCandidates");
+      maxNumOfWorkingCandidates = newMaxNumOfWorkingCandidates;
+    } else if (Memory.compareStrings(key, "maxNumOfCandidates")) {
+      require(value.length == 32, "length of maxNumOfCandidates mismatch");
+      uint256 newMaxNumOfCandidates = BytesToTypes.bytesToUint256(32, value);
+      require(newMaxNumOfCandidates >= 0, "the maxNumOfCandidates must be not less than 0");
+      maxNumOfCandidates = newMaxNumOfCandidates;
+    } else if (Memory.compareStrings(key, "numOfActiveValidators")) {
+      require(value.length == 32, "length of numOfActiveValidators mismatch");
+      uint256 newNumOfActiveValidators = BytesToTypes.bytesToUint256(32, value);
+      require(newNumOfActiveValidators > 0, "the numOfActiveValidators must be greater than 0");
+      numOfActiveValidators = newNumOfActiveValidators;
     } else {
       require(false, "unknown param");
     }
