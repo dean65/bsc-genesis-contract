@@ -566,10 +566,10 @@ describe('BSCValidatorSet', () => {
   });
 
   it('common case 1-25: getMiningValidators', async () => {
-    //  set numOfActiveValidators to 17
+    //  set numOfCabinets to 17
     let govChannelSeq = await crosschain.channelReceiveSequenceMap(GOV_CHANNEL_ID);
     let govValue = '0x0000000000000000000000000000000000000000000000000000000000000011'; // 17;
-    let govPackageBytes = serializeGovPack('numOfActiveValidators', govValue, validatorSet.address);
+    let govPackageBytes = serializeGovPack('numOfCabinets', govValue, validatorSet.address);
     await crosschain
       .connect(operator)
       .handlePackage(
@@ -579,7 +579,7 @@ describe('BSCValidatorSet', () => {
         govChannelSeq,
         GOV_CHANNEL_ID
       );
-    expect(await validatorSet.numOfActiveValidators()).to.be.eq(BigNumber.from(govValue));
+    expect(await validatorSet.numOfCabinets()).to.be.eq(BigNumber.from(govValue));
 
     //  set maxNumOfWorkingCandidates to 3
     govChannelSeq = await crosschain.channelReceiveSequenceMap(GOV_CHANNEL_ID);
@@ -598,9 +598,9 @@ describe('BSCValidatorSet', () => {
 
     var validators = await validatorSet.getValidators();
     var epochNumber = 0;
-    var numOfActiveValidators = 17;
+    var numOfCabinets = 17;
     for (var i=epochNumber;i <5;i++){
-      expect(await validatorSet.getMiningValidators(i)).to.not.deep.eq(validators.slice(0,numOfActiveValidators));
+      expect(await validatorSet.getMiningValidators(i)).to.not.deep.eq(validators.slice(0,numOfCabinets));
       expect(await validatorSet.getMiningValidators(i)).to.deep.eq(await validatorSet.getMiningValidators(i));
     }
 
@@ -618,6 +618,6 @@ describe('BSCValidatorSet', () => {
         GOV_CHANNEL_ID
       );
     expect(await validatorSet.maxNumOfWorkingCandidates()).to.be.eq(BigNumber.from(govValue));
-    expect(await validatorSet.getMiningValidators(5)).to.deep.eq(validators.slice(0,numOfActiveValidators));
+    expect(await validatorSet.getMiningValidators(4)).to.deep.eq(validators.slice(0,numOfCabinets));
   });
 });
