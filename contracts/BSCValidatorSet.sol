@@ -68,7 +68,7 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
   mapping(address => MaintainInfo) public maintainInfoMap;
 
   // BEP-131 candidate validator
-  uint256 public numOfActiveValidators = 21;
+  uint256 public numOfCabinets = 21;
   uint256 public maxNumOfCandidates = 20;
   uint256 public maxNumOfWorkingCandidates = 2;
 
@@ -350,33 +350,30 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
   }
 
   function swap(address[] memory set, uint i, uint j) internal pure {
-        address tmp = set[i];
-        set[i]=set[j];
-        set[j]=tmp;
+    address tmp = set[i];
+    set[i]=set[j];
+    set[j]=tmp;
+  }
+
+  function shuffle(address[] memory validators, uint256 epochNumber, uint start, uint limit, uint modNumber) internal pure {
+    for (uint i = 0; i<limit; i++) {
+      uint random = uint(keccak256(abi.encodePacked(epochNumber, validators[i]))) % modNumber;
+      if ( i!=random ) {
+        swap(validators, start+i, start+random);
+      }
+    }
   }
 
   function getMiningValidators(uint256 epochNumber) public view returns(address[] memory) {
     address[] memory validators = getValidators();
-    if (validators.length <= numOfActiveValidators) {
+    if (validators.length <= numOfCabinets) {
       return validators;
     }
     
-    uint round = epochNumber % numOfActiveValidators;
-    uint start = numOfActiveValidators - maxNumOfWorkingCandidates;
-    for (uint i = 0; i<maxNumOfWorkingCandidates; i++) {
-        uint target=(round+i)%numOfActiveValidators;
-        if ( (start+i)!= target ) {
-          swap(validators, target, start+i);
-        }
-    }
-    uint randomSize = validators.length-numOfActiveValidators;
-    for (uint i=start; i<validators.length; i++) {
-      uint random = uint(keccak256(abi.encodePacked(epochNumber, validators[i]))) % randomSize;
-      swap(validators, i, numOfActiveValidators+random);
-    }
-
-    address[] memory miningValidators = new address[](numOfActiveValidators);
-    for (uint i=0;i<numOfActiveValidators;i++) {
+    shuffle(validators, epochNumber, 0, maxNumOfWorkingCandidates, numOfCabinets);
+    shuffle(validators, epochNumber, numOfCabinets-maxNumOfWorkingCandidates, maxNumOfWorkingCandidates, validators.length-numOfCabinets+maxNumOfWorkingCandidates);
+    address[] memory miningValidators = new address[](numOfCabinets);
+    for (uint i=0;i<numOfCabinets;i++) {
       miningValidators[i] = validators[i];
     }
     return miningValidators;
@@ -527,11 +524,11 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
       uint256 newMaxNumOfCandidates = BytesToTypes.bytesToUint256(32, value);
       require(newMaxNumOfCandidates >= 0, "the maxNumOfCandidates must be not less than 0");
       maxNumOfCandidates = newMaxNumOfCandidates;
-    } else if (Memory.compareStrings(key, "numOfActiveValidators")) {
-      require(value.length == 32, "length of numOfActiveValidators mismatch");
-      uint256 newNumOfActiveValidators = BytesToTypes.bytesToUint256(32, value);
-      require(newNumOfActiveValidators > 0, "the numOfActiveValidators must be greater than 0");
-      numOfActiveValidators = newNumOfActiveValidators;
+    } else if (Memory.compareStrings(key, "numOfCabinets")) {
+      require(value.length == 32, "length of numOfCabinets mismatch");
+      uint256 newNumOfCabinets = BytesToTypes.bytesToUint256(32, value);
+      require(newNumOfCabinets > 0, "the numOfCabinets must be greater than 0");
+      numOfCabinets = newNumOfCabinets;
     } else {
       require(false, "unknown param");
     }
