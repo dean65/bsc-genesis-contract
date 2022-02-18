@@ -68,9 +68,12 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
   mapping(address => MaintainInfo) public maintainInfoMap;
 
   // BEP-131 candidate validator
-  uint256 public numOfCabinets = 21;
-  uint256 public maxNumOfCandidates = 20;
-  uint256 public maxNumOfWorkingCandidates = 2;
+  uint256 public constant INIT_NUM_OF_CABINETS = 21;
+  uint256 public constant INIT_MAX_NUM_OF_CANDIDATES = 20;
+  uint256 public constant INIT_MAX_NUM_OF_WORKING_CANDIDATES = 2;
+  uint256 public numOfCabinets;
+  uint256 public maxNumOfCandidates;
+  uint256 public maxNumOfWorkingCandidates;
 
   struct Validator{
     address consensusAddress;
@@ -349,31 +352,41 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
     return CODE_OK;
   }
 
-  function swap(address[] memory set, uint i, uint j) internal pure {
-    address tmp = set[i];
-    set[i]=set[j];
-    set[j]=tmp;
+  function swap(address[] memory addresses, uint i, uint j) internal pure {
+    address tmp = addresses[i];
+    addresses[i]=addresses[j];
+    addresses[j]=tmp;
   }
 
-  function shuffle(address[] memory validators, uint256 epochNumber, uint start, uint limit, uint modNumber) internal pure {
+  function shuffle(address[] memory validators, uint256 epochNumber, uint startIdx, uint offset, uint limit, uint modNumber) internal pure {
     for (uint i = 0; i<limit; i++) {
-      uint random = uint(keccak256(abi.encodePacked(epochNumber, validators[i]))) % modNumber;
-      if ( i!=random ) {
-        swap(validators, start+i, start+random);
+      uint random = uint(keccak256(abi.encodePacked(epochNumber, validators[startIdx+i]))) % modNumber;
+      if ( (startIdx+i) != (offset+random) ) {
+        swap(validators, startIdx+i, offset+random);
       }
     }
   }
 
   function getMiningValidators(uint256 epochNumber) public view returns(address[] memory) {
+    uint256 _maxNumOfWorkingCandidates = maxNumOfWorkingCandidates;
+    uint256 _numOfCabinets = numOfCabinets;
+    if (_maxNumOfWorkingCandidates == 0 ){
+      _maxNumOfWorkingCandidates = INIT_MAX_NUM_OF_WORKING_CANDIDATES;
+    }
+    if (_numOfCabinets == 0 ){
+      _numOfCabinets = INIT_NUM_OF_CABINETS;
+    }
+
     address[] memory validators = getValidators();
-    if (validators.length <= numOfCabinets) {
+    if (validators.length <= _numOfCabinets) {
       return validators;
     }
     
-    shuffle(validators, epochNumber, 0, maxNumOfWorkingCandidates, numOfCabinets);
-    shuffle(validators, epochNumber, numOfCabinets-maxNumOfWorkingCandidates, maxNumOfWorkingCandidates, validators.length-numOfCabinets+maxNumOfWorkingCandidates);
-    address[] memory miningValidators = new address[](numOfCabinets);
-    for (uint i=0;i<numOfCabinets;i++) {
+    shuffle(validators, epochNumber, _numOfCabinets-_maxNumOfWorkingCandidates, 0, _maxNumOfWorkingCandidates, _numOfCabinets);
+    shuffle(validators, epochNumber, _numOfCabinets-_maxNumOfWorkingCandidates, _numOfCabinets-_maxNumOfWorkingCandidates,
+     _maxNumOfWorkingCandidates, validators.length-_numOfCabinets+_maxNumOfWorkingCandidates);
+    address[] memory miningValidators = new address[](_numOfCabinets);
+    for (uint i=0;i<_numOfCabinets;i++) {
       miningValidators[i] = validators[i];
     }
     return miningValidators;
@@ -516,13 +529,17 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
     } else if (Memory.compareStrings(key, "maxNumOfWorkingCandidates")) {
       require(value.length == 32, "length of maxNumOfWorkingCandidates mismatch");
       uint256 newMaxNumOfWorkingCandidates = BytesToTypes.bytesToUint256(32, value);
-      require(newMaxNumOfWorkingCandidates >= 0, "the maxNumOfWorkingCandidates must be not less than 0");
-      require(newMaxNumOfWorkingCandidates <= maxNumOfCandidates, "the maxNumOfWorkingCandidates must be not less than maxNumOfCandidates");
+      require(newMaxNumOfWorkingCandidates > 0, "the maxNumOfWorkingCandidates must be not less than 0");
+      uint256 _maxNumOfCandidates = maxNumOfCandidates;
+      if (_maxNumOfCandidates == 0) {
+        _maxNumOfCandidates = INIT_MAX_NUM_OF_CANDIDATES;
+      }
+      require(newMaxNumOfWorkingCandidates <= _maxNumOfCandidates, "the maxNumOfCandidates must be not greater than maxNumOfCandidates");
       maxNumOfWorkingCandidates = newMaxNumOfWorkingCandidates;
     } else if (Memory.compareStrings(key, "maxNumOfCandidates")) {
       require(value.length == 32, "length of maxNumOfCandidates mismatch");
       uint256 newMaxNumOfCandidates = BytesToTypes.bytesToUint256(32, value);
-      require(newMaxNumOfCandidates >= 0, "the maxNumOfCandidates must be not less than 0");
+      require(newMaxNumOfCandidates > 0, "the maxNumOfCandidates must be not less than 0");
       maxNumOfCandidates = newMaxNumOfCandidates;
     } else if (Memory.compareStrings(key, "numOfCabinets")) {
       require(value.length == 32, "length of numOfCabinets mismatch");

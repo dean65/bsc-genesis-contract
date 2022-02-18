@@ -603,21 +603,5 @@ describe('BSCValidatorSet', () => {
       expect(await validatorSet.getMiningValidators(i)).to.not.deep.eq(validators.slice(0,numOfCabinets));
       expect(await validatorSet.getMiningValidators(i)).to.deep.eq(await validatorSet.getMiningValidators(i));
     }
-
-    //  set maxNumOfWorkingCandidates to 0
-    govChannelSeq = await crosschain.channelReceiveSequenceMap(GOV_CHANNEL_ID);
-    govValue = '0x0000000000000000000000000000000000000000000000000000000000000000'; // 0;
-    govPackageBytes = serializeGovPack('maxNumOfWorkingCandidates', govValue, validatorSet.address);
-    await crosschain
-      .connect(operator)
-      .handlePackage(
-        Buffer.concat([buildSyncPackagePrefix(2e16), govPackageBytes]),
-        proof,
-        merkleHeight,
-        govChannelSeq,
-        GOV_CHANNEL_ID
-      );
-    expect(await validatorSet.maxNumOfWorkingCandidates()).to.be.eq(BigNumber.from(govValue));
-    expect(await validatorSet.getMiningValidators(4)).to.deep.eq(validators.slice(0,numOfCabinets));
   });
 });
