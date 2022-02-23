@@ -352,17 +352,13 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
     return CODE_OK;
   }
 
-  function swap(address[] memory addresses, uint i, uint j) internal pure {
-    address tmp = addresses[i];
-    addresses[i]=addresses[j];
-    addresses[j]=tmp;
-  }
-
   function shuffle(address[] memory validators, uint256 epochNumber, uint startIdx, uint offset, uint limit, uint modNumber) internal pure {
     for (uint i = 0; i<limit; i++) {
-      uint random = uint(keccak256(abi.encodePacked(epochNumber, validators[startIdx+i]))) % modNumber;
+      uint random = uint(keccak256(abi.encodePacked(epochNumber, startIdx+i))) % modNumber;
       if ( (startIdx+i) != (offset+random) ) {
-        swap(validators, startIdx+i, offset+random);
+        address tmp = validators[startIdx+i];
+        validators[startIdx+i] = validators[offset+random];
+        validators[offset+random] = tmp;
       }
     }
   }
